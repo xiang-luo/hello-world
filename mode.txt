@@ -1,0 +1,82 @@
+ 实操举例：https://www.cnblogs.com/51record/p/15992779.html
+格式:
+pipeline {
+    agent any
+
+　　tools  {定义maven工具和变量}
+   environment {定义Git地址，服务器IP，服务器目录}
+   parameters  {定义参数默认值，名称，定义trim函数移除字符串两侧的空白字符或其他预定义字符}
+   stages {
+        stage('checkout')检出步骤
+        stage('build')编译步骤
+        stage('deploy')部署步骤
+    }
+}
+
+实例:
+pipeline {
+    agent any
+
+    tools {
+        // Install the Maven version configured as "M3" and add it to the path.
+        maven "M3"
+    }
+    environment {
+        __GIT_URL = "http://10.191.X.XXX:3000/Developments/DIOT.git"
+        // __APP_NAME = "bigdata-pv"
+        __REMOTE_IP = "10.191.X.XXX"
+        __REMOTE_DIR = "/opt/backend/"
+    }
+
+    parameters {
+        string defaultValue: 'master', description: '', name: 'BRANCH_TAG', trim: true
+    }
+    
+
+    stages {
+        stage('checkout') {
+            
+            steps {
+                
+                // Get some code from a GitHub repository
+                checkout([$class: 'GitSCM', branches: [[name: '${BRANCH_TAG}']],
+                    userRemoteConfigs: 
+                            [[
+                                credentialsId: '9c848141-f748-4491-b547-6379452a37ad', 
+                                url: "${__GIT_URL}"
+                            ]]]
+                        )
+            }
+            
+        }
+        stage('build') {
+            
+            steps {
+                sh "cd ui-ngx/"
+                sh "mvn clean package -DskipTests"
+                sh "cd .."
+                sh "mvn clean package -DskipTests"
+                
+            }
+        }
+        stage('deploy') {
+            steps {
+                // sh "scp ${WORKSPACE}/application/target/*.rpm root@${__REMOTE_IP}:${__REMOTE_DIR}"
+                // sh "ssh root@${__REMOTE_IP} -t 'systemctl stop thinsboard && sleep 3 && sudo rpm -Uvh thingsboard.rpm --nodeps --force && sleep3 && systemctl start thinsboard; bash'"
+                sh "scp ${WORKSPACE}/application/target/*-boot.jar root@${__REMOTE_IP}:${__REMOTE_DIR}"
+                sh "ssh root@${__REMOTE_IP} -t 'cd ${__REMOTE_DIR} && sleep 3 && ./start.sh; bash'"
+                
+            }
+        }
+        stage('Test') {
+            steps {
+                echo 'test....'
+            }
+        }
+        // stage('归档') {
+        //     steps {
+        //         archiveArtifacts artifacts: 'target/*.jar'
+        //     }
+        // }
+    }
+}
